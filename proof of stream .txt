@@ -1,0 +1,53 @@
+🪟 WINDOW 3 — Pre-flight (do this once, before anything else)
+1. Check Spark UI: http://localhost:8090 — confirm no zombie apps running, workers ALIVE.
+2. Clear the checkpoint:
+bashdocker exec docker-hive-namenode-1 hdfs dfs -rm -r /data/djezzy/checkpoints/party_streaming
+
+🪟 WINDOW 1 — Spark shell
+3. Enter container:
+bashdocker exec -it spark-master /bin/bash
+4. Launch shell:
+bash/spark/bin/spark-shell \
+  --master spark://spark-master:7077 \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
+  --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
+  --jars /opt/hudi-spark-bundle_2.11-0.10.0.jar,/opt/avro-1.11.0.jar \
+  --total-executor-cores 4 \
+  --executor-memory 1g
+5. Check baseline count (note this number):
+scalaspark.read.format("hudi").load("hdfs://docker-hive-namenode-1:8020/data/djezzy/silver/party").count()
+6. Start the streaming job:
+:paste
+Paste your full StreamingPartyJob.scala (with query.awaitTermination() included for the live demo, since this is the real run — see note below ⚠️).
+⚠️ Important trade-off: with awaitTermination(), this shell will be blocked — you won't be able to run count checks in it. So for this specific "prove it to the jury" demo, you have two options:
+
+Option A (simplest, recommended): leave awaitTermination() OUT for this verification run too, same as before — lets you check counts in the same window. Less "dramatic" visually but functionally proves everything cleanly.
+Option B: keep awaitTermination() IN, and check counts from a totally separate Spark session in another terminal instead.
+
+I'd go with Option A for the "prove it works" moment — it's simpler, less can go wrong live, and the jury cares about the result, not the blocked terminal aesthetic. Save awaitTermination() for your main scripted demo earlier in the presentation.
+So: paste the script without the last line, same as before.
+
+🪟 WINDOW 2 — Kafka producer
+7. Open producer:
+bashdocker exec -it kafka_broker kafka-console-producer --broker-list kafka_broker:29092 --topic customer-subscription
+8. Send a new test customer (insert):
+json{"customer":{"id":"DEMO001","first-name":"Sara","last-name":"Khaled","legal-address":{"city":"Constantine","postal-code":"25000"},"segmentation-category":"POSTPAID"},"subscription":{"msisdn":"0666111222"}}
+Wait ~30-40 seconds.
+
+🪟 WINDOW 1
+9. Check count — type fresh, don't paste any warning text mixed in:
+scalaspark.read.format("hudi").load("hdfs://docker-hive-namenode-1:8020/data/djezzy/silver/party").count()
+→ Should be baseline + 1. This proves insert.
+
+🪟 WINDOW 2
+10. Send an update for the same Id, different city:
+json{"customer":{"id":"DEMO001","first-name":"Sara","last-name":"Khaled","legal-address":{"city":"Annaba","postal-code":"23000"},"segmentation-category":"POSTPAID"},"subscription":{"msisdn":"0666111222"}}
+Wait ~30-40 seconds.
+
+🪟 WINDOW 1
+11. Check count again:
+scalaspark.read.format("hudi").load("hdfs://docker-hive-namenode-1:8020/data/djezzy/silver/party").count()
+→ Should be the same as step 9's result. This proves no duplicate.
+12. Show the actual row:
+scalaspark.read.format("hudi").load("hdfs://docker-hive-namenode-1:8020/data/djezzy/silver/party").filter("Id = 'DEMO001'").show()
+→ Should show city = Annaba, wilaya = 23. This proves the merge actually updated the value.

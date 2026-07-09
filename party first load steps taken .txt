@@ -1,0 +1,38 @@
+#copy the avro and hudi jar 
+docker cp "C:\hudi-jars\hudi-spark-bundle_2.11-0.10.0.jar" spark-master:/opt/hudi-spark-bundle_2.11-0.10.0.jar
+
+docker cp "C:\Users\TMA Tech\AppData\Local\Coursier\cache\v1\https\repo1.maven.org\maven2\org\apache\avro\avro\1.11.0\avro-1.11.0.jar" spark-master:/opt/avro-1.11.0.jar
+
+
+# Now copy the PARTY.csv into the spark containers:
+
+docker cp "C:\Data-files\PARTY\PARTY.csv" spark-master:/tmp/PARTY.csv
+
+docker cp "C:\Data-files\PARTY\PARTY.csv" spark-worker1:/tmp/PARTY.csv
+docker cp "C:\Data-files\PARTY\PARTY.csv" spark-worker2:/tmp/PARTY.csv
+
+
+
+
+Party bulk insert
+
+docker exec -it spark-master bash
+
+/spark/bin/spark-shell --master spark://spark-master:7077 --jars /opt/hudi-spark-bundle_2.11-0.10.0.jar,/opt/avro-1.11.0.jar --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer"
+
+
+
+
+#Copy it into the file container:
+
+docker cp "C:\Users\TMA Tech\Downloads\PartyBulkInsert.scala" spark-master:/tmp/PartyBulkInsert.scala
+
+# submit it:
+
+docker exec -it spark-master /spark/bin/spark-shell ^
+  --master spark://spark-master:7077 ^
+  --jars /opt/hudi-spark-bundle_2.11-0.10.0.jar,/opt/avro-1.11.0.jar ^
+  --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" ^
+  --conf "spark.sql.extensions=org.apache.hudi.spark.sql.HoodieSparkSessionExtension" ^
+  --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog" ^
+  -i /tmp/PartyBulkInsert.scala
