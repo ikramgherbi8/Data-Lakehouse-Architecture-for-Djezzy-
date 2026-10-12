@@ -102,7 +102,3 @@ Give the namenode/datanode/hive-metastore a minute or two to become healthy befo
 
 ## Notes
 - The Hive DBCP connection pool in the NiFi flow uses a placeholder database user; update to your actual Hive user before running.
-## Author
-
-Ikram Gherbi — Data Engineer, Master 2 ISIA, Université Hassiba Benbouali de Chlef
-GitHub: [github.com/ikramgherbi8](https://github.com/ikramgherbi8)
