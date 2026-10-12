@@ -1,3 +1,4 @@
+name: docker-hive
 version: "3"
 services:
   namenode:
